@@ -16,28 +16,31 @@ readme = "README.md"
 leptos = { version = "0.8" }
 leptos_axum = { version = "0.8", optional = true }
 leptos_router = { version = "0.8", optional = true }
-# leptos = { path = "../leptos/leptos" }
-# leptos_axum = { path = "../leptos/integrations/axum", optional = true }
-# leptos_router = { path = "../leptos/router", optional = true }
 
-bevy_ecs = { version = "0.18", features = ["serialize"]}
-bevy_app = { version = "0.18" }
-#bevy_ecs = { path = "../bevy/crates/bevy_ecs" }
-#bevy_app = { path = "../bevy/crates/bevy_app" }
+bevy_ecs = { version = "0.20.1", features = ["serialize"] }
+bevy_app = "0.20.1"
 
-axum = { version = "0.8", optional = true }
-tokio = { version = "1.43.0", features = ["full"], optional = true }
+axum = { version = "0.8.9", optional = true }
+tokio = { version = "1.54.1", optional = true, features = ["full"] }
 tower = { version = "0.5", features = ["full"], optional = true }
-tower-http = { version = "0.6", features = ["full"], optional = true }
+tower-http = { version = "0.7.1", optional = true, features = ["full"] }
 tokio-util = { version = "0.7", features = ["rt"], optional = true }
 
 serde = { version = "1", features = ["derive"], optional = true }
-ron = { version = "0.8.1", optional = true }
-gray_matter = { version = "0.2.6", optional = true }
+ron = { version = "0.12.3", optional = true }
+gray_matter = { version = "0.3.2", optional = true }
 pulldown-cmark = { version = "0.13", optional = true }
 
 [features]
 development = []
-generator = ["dep:axum", "dep:tokio", "dep:tower", "dep:tower-http", "dep:leptos_axum", "dep:leptos_router", "dep:tokio-util"]
+generator = [
+    "dep:axum",
+    "dep:tokio",
+    "dep:tower",
+    "dep:tower-http",
+    "dep:leptos_axum",
+    "dep:leptos_router",
+    "dep:tokio-util",
+]
 ron = ["dep:serde", "dep:ron"]
 markdown = ["dep:serde", "dep:gray_matter", "dep:pulldown-cmark"]

@@ -7,14 +7,15 @@ use bevy_ecs::entity::Entity;
 use bevy_ecs::prelude::{Commands, Query, Resource};
 use bevy_ecs::schedule::{IntoScheduleConfigs, SystemSet};
 use bevy_ecs::system::Res;
-use gray_matter::Matter;
 use gray_matter::engine::YAML;
+use gray_matter::{Matter, ParsedEntity};
 use pulldown_cmark::{Options, Parser, html};
 use serde::de::DeserializeOwned;
+use std::error::Error;
+use std::fs;
 use std::fs::read_to_string;
 use std::marker::PhantomData;
 use std::path::Path;
-use std::{fs, io};
 
 /// System sets related to markdown and markdown to HTML conversion
 #[derive(SystemSet, Clone, Debug, PartialEq, Eq, Hash)]
@@ -100,7 +101,7 @@ fn read_markdown_from_directories<
     fn read_from_dir<FrontMatter: Ingest + DeserializeOwned + Sync + Send + 'static>(
         path: &Path,
         commands: &mut Commands,
-    ) -> io::Result<Vec<Entity>> {
+    ) -> Result<Vec<Entity>, Box<dyn Error>> {
         let mut files = vec![];
 
         for entry in fs::read_dir(path)? {
@@ -124,10 +125,10 @@ fn read_markdown_from_directories<
 fn read_markdown<FrontMatter: Ingest + DeserializeOwned + Sync + Send + 'static>(
     path: &Path,
     commands: &mut Commands,
-) -> io::Result<Entity> {
+) -> Result<Entity, Box<dyn Error>> {
     let file = read_to_string(path)?;
     let matter = Matter::<YAML>::new();
-    let markdown = matter.parse(&file);
+    let markdown: ParsedEntity = matter.parse(&file)?;
     let mut file = commands.spawn(());
     if let Some(front_matter) = markdown.data {
         let parsed_front_matter = front_matter.deserialize::<FrontMatter>()?;
