@@ -9,7 +9,7 @@ use bevy_ecs::schedule::{IntoScheduleConfigs, SystemSet};
 use bevy_ecs::system::Res;
 use gray_matter::engine::YAML;
 use gray_matter::{Matter, ParsedEntity};
-use pulldown_cmark::{Options, Parser, html};
+use pulldown_cmark::{CowStr, Event, Options, Parser, Tag, html};
 use serde::de::DeserializeOwned;
 use std::error::Error;
 use std::fs;
@@ -143,13 +143,22 @@ fn read_markdown<FrontMatter: Ingest + DeserializeOwned + Sync + Send + 'static>
 #[derive(Component, Clone)]
 pub struct MarkdownBody(pub String);
 
+/// Rewrite paths in markdown to reference copied assets in dist/
+pub trait MarkdownAttachments: Default + Send + Sync + 'static {
+    /// Base path of original attachments
+    const BASE_PATH: Option<&'static str> = None;
+}
+
 /// Plugin to convert all markdown content to HTML
 ///
 /// The plugin will query for all [`MarkdownBody`] components and add a [`Html`] component to
 /// each of the entities.
-pub struct ConvertMarkdownToHtml;
+#[derive(Default)]
+pub struct ConvertMarkdownToHtml<A: MarkdownAttachments> {
+    _p: PhantomData<A>,
+}
 
-impl Plugin for ConvertMarkdownToHtml {
+impl<A: MarkdownAttachments> Plugin for ConvertMarkdownToHtml<A> {
     fn build(&self, app: &mut App) {
         app.configure_sets(
             Update,
@@ -157,18 +166,49 @@ impl Plugin for ConvertMarkdownToHtml {
         )
         .add_systems(
             Update,
-            convert_markdown_to_html.in_set(MarkdownSystems::Convert),
+            convert_markdown_to_html::<A>.in_set(MarkdownSystems::Convert),
         );
     }
 }
 
-fn convert_markdown_to_html(markdown: Query<(Entity, &MarkdownBody)>, mut commands: Commands) {
+fn convert_markdown_to_html<A: MarkdownAttachments>(
+    markdown: Query<(Entity, &MarkdownBody)>,
+    mut commands: Commands,
+) {
     for (file, MarkdownBody(markdown)) in &markdown {
-        let parser = Parser::new_ext(markdown, Options::all());
+        let parser = Parser::new_ext(markdown, Options::all()).map(|ev| {
+            if let Some(base_path) = A::BASE_PATH {
+                match ev {
+                    Event::Start(Tag::Image {
+                        link_type,
+                        dest_url,
+                        title,
+                        id,
+                    }) => Event::Start(Tag::Image {
+                        link_type,
+                        dest_url: CowStr::from(rewrite_image(&dest_url, base_path)),
+                        title,
+                        id,
+                    }),
+                    other => other,
+                }
+            } else {
+                ev
+            }
+        });
         let mut html = String::new();
         html::push_html(&mut html, parser);
         commands.entity(file).insert(Html(html));
     }
+}
+
+fn rewrite_image(dest: &str, base_path: &str) -> String {
+    let is_local = !dest.contains("://") && !dest.starts_with('/') && !dest.starts_with("data:");
+    if !is_local {
+        return dest.to_string();
+    }
+    let file = dest.rsplit('/').next().unwrap_or(dest);
+    format!("{}/{}", base_path.trim_end_matches('/'), file)
 }
 
 /// Component containing HTML
